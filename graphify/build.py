@@ -50,7 +50,9 @@ def main() -> int:
     ast = extract(code_files, cache_root=repo) if code_files else {"nodes": [], "edges": []}
     (out / ".graphify_ast.json").write_text(json.dumps(ast, ensure_ascii=False), encoding="utf-8")
 
-    # 2) build + cluster → graph.json
+    # 2) build + cluster → graph.json. Clustering prefers Leiden (graspologic, Python
+    # <3.13) and falls back to Louvain (networkx, built in) otherwise — it never fails;
+    # blast-radius is unaffected either way.
     G = build([ast], root=str(repo))
     comm = cluster(G)
     labels_path = out / ".graphify_labels.json"
