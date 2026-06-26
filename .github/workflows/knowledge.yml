@@ -4,10 +4,20 @@ name: knowledge
 #   lint          — PR gate: schema-validate changed wiki units (replaces a curator)
 #   publish-wiki  — on merge to main: render docs/wiki/ and push to the GitHub Wiki
 #
-# One-time prerequisite for publish-wiki: the repo's wiki must already exist. Create
-# it once in the GitHub UI (repo → Wiki → "Create the first page", save anything) —
-# after that this Action owns it. The wiki inherits the repo's visibility (private
-# repo → private wiki). The wiki is a DERIVED MIRROR: edit docs/wiki/, not the UI.
+# Prerequisites for publish-wiki:
+#  1. The repo's wiki must already exist: repo → Wiki → "Create the first page",
+#     save anything (a wiki can't be pushed to until it exists). After that this
+#     Action owns it. Wiki visibility follows the repo (private repo → private wiki).
+#     The wiki is a DERIVED MIRROR: edit docs/wiki/, not the UI.
+#  2. A token that can push to the wiki. The built-in GITHUB_TOKEN works ONLY if the
+#     org allows write (the repo "Workflow permissions" toggle). If that toggle is
+#     greyed out (org/enterprise-managed) or you'd rather not depend on it, create a
+#     token and store it as the repo secret WIKI_TOKEN — the push step prefers it and
+#     falls back to GITHUB_TOKEN. Options for WIKI_TOKEN (any one):
+#       - Fine-grained PAT: Repository access = this repo, Permissions → Contents: RW.
+#       - Classic PAT: scope `repo` (most reliable for wikis).
+#       - Deploy key with write access (most scoped; add private key as the secret).
+#     Add it under repo → Settings → Secrets and variables → Actions → New secret.
 
 on:
   pull_request:
@@ -46,8 +56,10 @@ jobs:
       - name: Refresh source-anchor manifest
         run: python3 docs/wiki/wiki-manifest docs/wiki/ --repo "${{ github.event.repository.name }}"
       - name: Push to GitHub Wiki
+        # Prefer a dedicated WIKI_TOKEN secret (works even when the repo "Workflow
+        # permissions" toggle is greyed out by org policy); fall back to GITHUB_TOKEN.
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WIKI_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name  "knowledge-bot"
           git config --global user.email "knowledge-bot@users.noreply.github.com"

@@ -32,8 +32,19 @@ and appends the knowledge block to `CLAUDE.md`.
 **2. Initialize the GitHub Wiki once (manual, one time):**
 Repo → **Wiki** → **Create the first page** → save anything. This creates
 `<repo>.wiki.git`; from now on the Action owns it. (A wiki can't be pushed to until
-it exists.) Make sure Actions have write permission: repo → Settings → Actions →
-General → Workflow permissions → **Read and write**.
+it exists.)
+
+**Give the Action a token that can push to the wiki.** Easiest: repo → Settings →
+Actions → General → Workflow permissions → **Read and write**. If that toggle is
+**greyed out** (managed by your org/enterprise), don't fight it — add a dedicated
+token secret instead, which the workflow prefers automatically:
+- Create a token: a fine-grained PAT (Repository access = this repo, Permissions →
+  **Contents: Read and write**), or a classic PAT with scope **`repo`** (most reliable
+  for wikis), or a write **deploy key**.
+- Add it under repo → Settings → Secrets and variables → Actions → **New repository
+  secret**, named **`WIKI_TOKEN`**.
+The `publish-wiki` job uses `WIKI_TOKEN` if present and falls back to `GITHUB_TOKEN`.
+Everything else (checkout, lint) only needs read, so a read-only default is fine.
 
 **3. Write the first unit** (or backfill from a boilerplate repo — Part C). Easiest:
 ask your Claude Code session, after any real change, to run the `wiki` skill. Or hand-write
