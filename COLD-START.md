@@ -97,8 +97,18 @@ clone is ready. The team contract is two habits, both encoded in `CLAUDE.md`:
 No one is "the docs person." The curator role is the **schema + CI gate**. Pruning and
 supersession are everyone's job (the skill makes them mechanical).
 
+**Pre-commit hook (lint + verify locally).** A committed hook at `.githooks/pre-commit`
+runs `wiki-lint` + `wiki-verify` whenever a commit touches `docs/wiki/`, so schema/drift
+errors never reach CI. `install.sh` enables it for the installing clone; **every other
+clone enables it once** (it's local git config, not committed):
+```bash
+git config core.hooksPath .githooks
+```
+If your repo already uses a hooks path (husky, pre-commit framework), don't override it —
+instead call `.githooks/pre-commit` from your existing hook. Bypass in an emergency with
+`git commit --no-verify`. Needs `python3` + `pyyaml` locally (skips with a note if absent).
+
 Tips:
-- Add `python3 docs/wiki/wiki-lint docs/wiki/` to a pre-commit hook for instant feedback.
 - PR template line: "If this changed durable truth, did you run `/wiki`?"
 - Keep units atomic — reviewers reject 500-line "kitchen sink" units.
 

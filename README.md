@@ -31,7 +31,8 @@ knowledge lives in its own repo's wiki. Mono-repo is the trivial unified case.
 ```
 your-repo/
 ├── .claude/skills/{wiki,code-graph}/SKILL.md   # the two skills
-├── .github/workflows/knowledge.yml             # PR lint gate + wiki publish
+├── .githooks/pre-commit                        # local lint+verify (core.hooksPath)
+├── .github/workflows/knowledge.yml             # PR lint+verify gate + wiki publish
 ├── CLAUDE.md                                    # + knowledge protocol block
 ├── docs/wiki/
 │   ├── SCHEMA.md  wiki-lint  wiki-verify  wiki-render  wiki-manifest

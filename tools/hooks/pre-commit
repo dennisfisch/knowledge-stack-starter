@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Knowledge stack pre-commit hook — lint + verify the wiki before committing, so
+# schema/drift errors never reach CI.
+#
+# Enable once per clone/machine:   git config core.hooksPath .githooks
+# (install.sh sets this automatically unless you already use a hooks path.)
+# Bypass in an emergency:          git commit --no-verify
+set -euo pipefail
+
+# Fast path: only run when this commit touches wiki units.
+if ! git diff --cached --name-only | grep -q '^docs/wiki/'; then
+  exit 0
+fi
+
+# Don't hard-block a commit just because local tooling is missing — CI still gates.
+if ! command -v python3 >/dev/null 2>&1 || ! python3 -c 'import yaml' 2>/dev/null; then
+  echo "knowledge hook: python3+pyyaml unavailable — skipping local wiki checks (CI still gates)." >&2
+  echo "  fix: pip install pyyaml" >&2
+  exit 0
+fi
+
+echo "knowledge: linting + verifying docs/wiki/ …"
+python3 docs/wiki/wiki-lint   docs/wiki/
+python3 docs/wiki/wiki-verify docs/wiki/ --repo-root .
+echo "knowledge: wiki OK"
