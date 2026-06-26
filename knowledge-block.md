@@ -1,6 +1,7 @@
 <!--
-Paste this block into the repo's CLAUDE.md (or AGENTS.md). It is the per-repo
-knowledge protocol: write-after-change + graph-first reading. Adjust the owner name.
+Paste this block into the repo's agent-instructions file — AGENTS.md (the cross-tool
+standard) or CLAUDE.md. install.sh appends it to AGENTS.md automatically. It is the
+per-repo knowledge protocol: write-after-change + graph-first reading. Adjust the owner.
 -->
 
 ## Knowledge protocol (wiki + code graph)

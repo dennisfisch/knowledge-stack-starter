@@ -6,7 +6,7 @@
 #
 # Always overwrites the TOOLING (skills, docs/wiki tools, graphify rig, hook, workflow)
 # and stamps .knowledge-stack-version. NEVER touches your wiki units, and never clobbers
-# an existing CLAUDE.md block, PR template, or CONTRIBUTING.md.
+# an existing knowledge block (AGENTS.md/CLAUDE.md), PR template, or CONTRIBUTING.md.
 set -euo pipefail
 KIT="$(cd "$(dirname "$0")" && pwd)"
 
@@ -57,11 +57,14 @@ for line in "graphify-out/" "graphify/.venv/" ".wiki-build/" "docs/wiki/manifest
   grep -qxF "$line" "$TARGET/.gitignore" || echo "$line" >> "$TARGET/.gitignore"
 done
 
-# --- non-tooling files: create only if absent (never clobber team content) ---
-CL="$TARGET/CLAUDE.md"; touch "$CL"
-if ! grep -q "Knowledge protocol (wiki + code graph)" "$CL"; then
-  { echo; sed '/^<!--/,/-->/d' "$KIT/CLAUDE.snippet.md"; } >> "$CL"
-  echo "appended knowledge block to CLAUDE.md"
+# --- agent-instructions block: append to AGENTS.md (the cross-tool standard). Prefer
+# an existing AGENTS.md; else an existing CLAUDE.md; else create AGENTS.md. Added once. ---
+if [ -f "$TARGET/AGENTS.md" ]; then AGENTS="$TARGET/AGENTS.md"
+elif [ -f "$TARGET/CLAUDE.md" ]; then AGENTS="$TARGET/CLAUDE.md"
+else AGENTS="$TARGET/AGENTS.md"; touch "$AGENTS"; fi
+if ! grep -q "Knowledge protocol (wiki + code graph)" "$AGENTS" 2>/dev/null; then
+  { echo; sed '/^<!--/,/-->/d' "$KIT/knowledge-block.md"; } >> "$AGENTS"
+  echo "appended knowledge block to $(basename "$AGENTS")"
 fi
 if [ ! -f "$TARGET/CONTRIBUTING.md" ]; then
   cp "$KIT/CONTRIBUTING.md" "$TARGET/CONTRIBUTING.md"
@@ -75,7 +78,7 @@ else
 fi
 
 if [ "$UPDATE" = 1 ]; then
-  echo "updated knowledge stack in $TARGET to v$VERSION ($KIT_COMMIT) — units & CLAUDE.md untouched"
+  echo "updated knowledge stack in $TARGET to v$VERSION ($KIT_COMMIT) — units & agent instructions untouched"
 else
   echo "installed knowledge stack v$VERSION into $TARGET"
   echo "next: see COLD-START.md (init the GitHub Wiki once, seed the first unit, build the graph)"

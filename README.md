@@ -16,7 +16,7 @@ enforced by a schema + CI gate.
 
 **Reading is graph-first** (architecture/blast-radius → query the graph before grep).
 **Writing is session-direct** (the session that made the change writes the wiki unit,
-same PR). The two are wired into the repo's `CLAUDE.md`.
+same PR). The two are wired into the repo's `AGENTS.md`.
 
 ## Why per-repo + federated (not one central docs repo)
 
@@ -33,7 +33,7 @@ your-repo/
 ├── .claude/skills/{wiki,code-graph}/SKILL.md   # the two skills
 ├── .githooks/pre-commit                        # local lint+verify (core.hooksPath)
 ├── .github/workflows/knowledge.yml             # PR lint+verify gate + wiki publish
-├── CLAUDE.md                                    # + knowledge protocol block
+├── AGENTS.md                                    # + knowledge protocol block
 ├── docs/wiki/
 │   ├── SCHEMA.md  wiki-lint  wiki-verify  wiki-render  wiki-manifest
 │   └── <slug>.md ...                            # the units
@@ -47,7 +47,7 @@ install.sh            # drop the stack into a repo; `--update` refreshes tooling
 VERSION               # kit version (stamped into each repo as .knowledge-stack-version)
 COLD-START.md         # step-by-step: set up · onboard team · ingest · mutate
 CONTRIBUTING.md       # one-page team cheat sheet (copied into repos that lack one)
-CLAUDE.snippet.md     # the knowledge block (install.sh appends it)
+knowledge-block.md    # the knowledge block (install.sh appends it to AGENTS.md)
 skills/               # wiki (write/mutate) · code-graph (read)
 tools/                # SCHEMA.md · wiki-lint · wiki-verify · wiki-render · wiki-manifest
 graphify/             # the repo-local code-graph rig (pinned)

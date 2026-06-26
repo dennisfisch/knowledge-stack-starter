@@ -27,7 +27,7 @@ knowledge-stack-starter/install.sh /path/to/your-repo
 ```
 This drops in `.claude/skills/{wiki,code-graph}`, `docs/wiki/` tools + `SCHEMA.md`,
 the `graphify/` rig, `.github/workflows/knowledge.yml`, gitignores the derived bits,
-and appends the knowledge block to `CLAUDE.md`.
+and appends the knowledge block to `AGENTS.md`.
 
 **2. Initialize the GitHub Wiki once (manual, one time):**
 Repo → **Wiki** → **Create the first page** → save anything. This creates
@@ -61,7 +61,7 @@ ask your Claude Code session, after any real change, to run the `wiki` skill. Or
 **4. Verify the gate locally, then push:**
 ```bash
 python3 docs/wiki/wiki-lint docs/wiki/        # must pass (0 errors)
-git add docs/wiki .claude .github CLAUDE.md graphify .gitignore
+git add docs/wiki .claude .github AGENTS.md graphify .gitignore
 git commit -m "knowledge stack + first units" && git push
 ```
 Open a PR → the **lint** job gates it. Merge to main → the **publish-wiki** job renders
@@ -85,8 +85,8 @@ file. CI does **not** build or store it; CI's graph role is the deterministic
 ## Part B — Onboard the team
 
 Each engineer needs, per repo, only what `install.sh` already committed: the two
-skills (`.claude/skills/`), the `CLAUDE.md` block, the `docs/wiki/` tools. So a fresh
-clone is ready. The team contract is two habits, both encoded in `CLAUDE.md`:
+skills (`.claude/skills/`), the `AGENTS.md` block, the `docs/wiki/` tools. So a fresh
+clone is ready. The team contract is two habits, both encoded in `AGENTS.md`:
 
 1. **Read graph-first.** For "how does X work / what does changing Y affect", run
    `python3 graphify/gquery.py blast "X"` before grepping.

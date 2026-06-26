@@ -63,4 +63,4 @@ The graph is derived + gitignored — rebuilt on demand, never committed.
 /path/to/knowledge-stack-starter/install.sh . --update
 ```
 Pulls the latest kit and refreshes the tooling/skills/workflow/hook. **Never touches
-your wiki units or CLAUDE.md.** Your repo's version is in `.knowledge-stack-version`.
+your wiki units or AGENTS.md.** Your repo's version is in `.knowledge-stack-version`.
