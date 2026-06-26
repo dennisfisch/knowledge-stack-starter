@@ -34,9 +34,9 @@ your-repo/
 ├── .github/workflows/knowledge.yml             # PR lint gate + wiki publish
 ├── CLAUDE.md                                    # + knowledge protocol block
 ├── docs/wiki/
-│   ├── SCHEMA.md  wiki-lint  wiki-render  wiki-manifest
+│   ├── SCHEMA.md  wiki-lint  wiki-verify  wiki-render  wiki-manifest
 │   └── <slug>.md ...                            # the units
-└── graphify/{setup-venv.sh,build.py,wiki-bridge.py,gquery.py}
+└── graphify/{setup-venv.sh,run,build.py,wiki-bridge.py,gquery.py}
 ```
 
 ## This kit
@@ -46,7 +46,7 @@ install.sh            # drop the stack into a target repo (one command)
 COLD-START.md         # step-by-step: set up · onboard team · ingest · mutate
 CLAUDE.snippet.md     # the knowledge block (install.sh appends it)
 skills/               # wiki (write/mutate) · code-graph (read)
-tools/                # SCHEMA.md · wiki-lint · wiki-render · wiki-manifest
+tools/                # SCHEMA.md · wiki-lint · wiki-verify · wiki-render · wiki-manifest
 graphify/             # the repo-local code-graph rig (pinned)
 .github/workflows/    # knowledge.yml
 examples/             # a sample unit

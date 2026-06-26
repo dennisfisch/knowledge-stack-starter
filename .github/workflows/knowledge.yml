@@ -39,6 +39,8 @@ jobs:
       - run: pip install --quiet pyyaml
       - name: Schema gate (corpus mode)
         run: python3 docs/wiki/wiki-lint docs/wiki/
+      - name: Drift gate — verify source anchors still resolve
+        run: python3 docs/wiki/wiki-verify docs/wiki/ --repo-root .
 
   publish-wiki:
     if: github.event_name == 'push'
@@ -90,16 +92,7 @@ jobs:
           git diff --cached --quiet || git commit -m "wiki: sync from docs/wiki/ @ ${GITHUB_SHA::7}"
           git push
 
-# OPTIONAL — repo-local code graph (Graphify). Heavier (pinned venv); enable when you
-# want graph-first reading in CI artifacts. Build is deterministic, AST-only, no API key.
-#  graph:
-#    if: github.event_name == 'push'
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#      - uses: actions/setup-python@v5
-#        with: { python-version: "3.12" }
-#      - run: graphify/setup-venv.sh
-#      - run: graphify/.venv/bin/python graphify/build.py --repo . --manifest docs/wiki/manifest.json --owner "${{ github.event.repository.name }}" --wiki-dir docs/wiki
-#      - uses: actions/upload-artifact@v4
-#        with: { name: code-graph, path: graphify-out/ }
+# The code graph is NOT built in CI and NOT committed — it is a derived artifact built
+# locally on demand (graphify/run build.py) in whatever worktree you're in, gitignored.
+# This avoids merge conflicts on a generated file across parallel devs/worktrees. CI's
+# graph role is the deterministic drift gate above (wiki-verify), no venv needed.

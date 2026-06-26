@@ -41,14 +41,17 @@ Check freshness: `built_at_commit` in `graphify-out/GRAPH_REPORT.md` vs
 `git rev-parse HEAD`. If stale or absent (AST rebuild is free, local):
 
 ```bash
-graphify/setup-venv.sh   # once
-python3 graphify/build.py --repo . \
-  --manifest docs/wiki/manifest.json --owner "$(basename "$PWD")" --wiki-dir docs/wiki
+graphify/setup-venv.sh                                   # once per MACHINE (shared venv)
+python3 docs/wiki/wiki-manifest docs/wiki --repo "$(basename "$PWD")"   # refresh anchors
+graphify/run build.py --repo . --manifest docs/wiki/manifest.json \
+  --owner "$(basename "$PWD")" --wiki-dir docs/wiki
 ```
 
 `build.py` runs detect → AST → cluster → reuse community labels → wiki-bridge →
-export. The semantic doc pass and one-time community naming are host/subscription
-steps (see the build output) — never an API key.
+export, into `graphify-out/` in the current worktree (gitignored, never committed —
+so parallel worktrees never conflict). Queries (`gquery.py`) need NO venv. The
+semantic doc pass and one-time community naming are host/subscription steps — never an
+API key.
 
 ## Rule
 

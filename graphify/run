@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# run — execute a graphify rig script with the SHARED venv (built once per machine).
+#
+# The venv lives OUTSIDE any worktree, so all worktrees/repos reuse one install (no
+# rebuild per worktree). Override the location with GRAPHIFY_VENV if you need to pin
+# a different graphify version for a given repo.
+#
+#   graphify/run build.py --repo . --manifest docs/wiki/manifest.json --owner <name> --wiki-dir docs/wiki
+#
+# Note: gquery.py needs NO venv (stdlib only) — run it directly: python3 graphify/gquery.py …
+set -euo pipefail
+VENV="${GRAPHIFY_VENV:-${XDG_DATA_HOME:-$HOME/.local/share}/knowledge-graphify/venv}"
+PY="$VENV/bin/python"
+if [ ! -x "$PY" ]; then
+  echo "graphify venv not found at $VENV — run graphify/setup-venv.sh once." >&2
+  exit 1
+fi
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec "$PY" "$DIR/$1" "${@:2}"

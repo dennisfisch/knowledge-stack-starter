@@ -61,8 +61,11 @@ def main() -> int:
     to_json(G, comm, str(out / "graph.json"), community_labels=labels,
             built_at_commit=_git_head(), force=True)
 
-    # 3) wiki-bridge (deterministic anchor join)
-    if not args.no_bridge and args.manifest and args.owner:
+    # 3) wiki-bridge (deterministic anchor join). Skipped gracefully if no manifest yet.
+    if not args.no_bridge and args.manifest and args.owner and not args.manifest.exists():
+        print(f"build: no manifest at {args.manifest} — skipping wiki bridge "
+              f"(run docs/wiki/wiki-manifest first to link wiki↔code)")
+    if not args.no_bridge and args.manifest and args.owner and args.manifest.exists():
         cmd = [sys.executable, str(Path(__file__).parent / "wiki-bridge.py"),
                "--graph", str(out / "graph.json"),
                "--manifest", str(args.manifest), "--owner", args.owner]

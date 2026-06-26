@@ -67,13 +67,18 @@ git commit -m "knowledge stack + first units" && git push
 Open a PR → the **lint** job gates it. Merge to main → the **publish-wiki** job renders
 and pushes to the GitHub Wiki. Visit repo → Wiki.
 
-**5. Build the code graph (optional but recommended):**
+**5. Build the code graph (local, on demand — never committed):**
 ```bash
-graphify/setup-venv.sh
-python3 graphify/build.py --repo . --manifest docs/wiki/manifest.json \
+graphify/setup-venv.sh                                   # once per MACHINE (shared venv)
+python3 docs/wiki/wiki-manifest docs/wiki --repo "$(basename "$PWD")"   # refresh anchors
+graphify/run build.py --repo . --manifest docs/wiki/manifest.json \
         --owner "$(basename "$PWD")" --wiki-dir docs/wiki
-python3 graphify/gquery.py blast "<some-symbol-or-slug>"
+python3 graphify/gquery.py blast "<some-symbol-or-slug>"   # queries need NO venv
 ```
+The graph (`graphify-out/`) is **derived and gitignored** — rebuilt on demand in
+whatever worktree you're in, so parallel devs/worktrees never conflict on a generated
+file. CI does **not** build or store it; CI's graph role is the deterministic
+**drift gate** (`wiki-verify`) in the lint job, which needs no venv.
 
 ---
 

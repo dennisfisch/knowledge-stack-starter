@@ -15,10 +15,10 @@ mkdir -p "$TARGET"/.claude/skills "$TARGET"/docs/wiki "$TARGET"/graphify "$TARGE
 
 cp -R "$KIT/skills/wiki"       "$TARGET/.claude/skills/"
 cp -R "$KIT/skills/code-graph" "$TARGET/.claude/skills/"
-cp "$KIT/tools/SCHEMA.md" "$KIT/tools/wiki-lint" "$KIT/tools/wiki-render" "$KIT/tools/wiki-manifest" "$TARGET/docs/wiki/"
-chmod +x "$TARGET"/docs/wiki/wiki-{lint,render,manifest}
-cp "$KIT"/graphify/{setup-venv.sh,build.py,wiki-bridge.py,gquery.py} "$TARGET/graphify/"
-chmod +x "$TARGET/graphify/setup-venv.sh"
+cp "$KIT/tools/SCHEMA.md" "$KIT/tools/wiki-lint" "$KIT/tools/wiki-render" "$KIT/tools/wiki-manifest" "$KIT/tools/wiki-verify" "$TARGET/docs/wiki/"
+chmod +x "$TARGET"/docs/wiki/wiki-{lint,render,manifest,verify}
+cp "$KIT"/graphify/{setup-venv.sh,run,build.py,wiki-bridge.py,gquery.py} "$TARGET/graphify/"
+chmod +x "$TARGET/graphify/setup-venv.sh" "$TARGET/graphify/run"
 cp "$KIT/.github/workflows/knowledge.yml" "$TARGET/.github/workflows/"
 
 # gitignore the derived/local bits
