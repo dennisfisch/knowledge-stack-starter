@@ -43,8 +43,10 @@ your-repo/
 ## This kit
 
 ```
-install.sh            # drop the stack into a target repo (one command)
+install.sh            # drop the stack into a repo; `--update` refreshes tooling later
+VERSION               # kit version (stamped into each repo as .knowledge-stack-version)
 COLD-START.md         # step-by-step: set up · onboard team · ingest · mutate
+CONTRIBUTING.md       # one-page team cheat sheet (copied into repos that lack one)
 CLAUDE.snippet.md     # the knowledge block (install.sh appends it)
 skills/               # wiki (write/mutate) · code-graph (read)
 tools/                # SCHEMA.md · wiki-lint · wiki-verify · wiki-render · wiki-manifest
