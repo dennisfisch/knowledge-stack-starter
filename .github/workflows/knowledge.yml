@@ -1,0 +1,74 @@
+name: knowledge
+
+# Two jobs, zero extra stack:
+#   lint          — PR gate: schema-validate changed wiki units (replaces a curator)
+#   publish-wiki  — on merge to main: render docs/wiki/ and push to the GitHub Wiki
+#
+# One-time prerequisite for publish-wiki: the repo's wiki must already exist. Create
+# it once in the GitHub UI (repo → Wiki → "Create the first page", save anything) —
+# after that this Action owns it. The wiki inherits the repo's visibility (private
+# repo → private wiki). The wiki is a DERIVED MIRROR: edit docs/wiki/, not the UI.
+
+on:
+  pull_request:
+    paths: ["docs/wiki/**"]
+  push:
+    branches: [main]
+    paths: ["docs/wiki/**"]
+
+permissions:
+  contents: write        # required so publish-wiki can push to <repo>.wiki.git
+
+jobs:
+  lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install --quiet pyyaml
+      - name: Schema gate (corpus mode)
+        run: python3 docs/wiki/wiki-lint docs/wiki/
+
+  publish-wiki:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install --quiet pyyaml
+      - name: Render wiki pages
+        run: |
+          python3 docs/wiki/wiki-render docs/wiki/ --out .wiki-build \
+            --repo-url "${{ github.server_url }}/${{ github.repository }}"
+      - name: Refresh source-anchor manifest
+        run: python3 docs/wiki/wiki-manifest docs/wiki/ --repo "${{ github.event.repository.name }}"
+      - name: Push to GitHub Wiki
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name  "knowledge-bot"
+          git config --global user.email "knowledge-bot@users.noreply.github.com"
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.wiki.git" wiki
+          rm -f wiki/*.md
+          cp .wiki-build/*.md wiki/
+          cd wiki
+          git add -A
+          git diff --cached --quiet || git commit -m "wiki: sync from docs/wiki/ @ ${GITHUB_SHA::7}"
+          git push
+
+# OPTIONAL — repo-local code graph (Graphify). Heavier (pinned venv); enable when you
+# want graph-first reading in CI artifacts. Build is deterministic, AST-only, no API key.
+#  graph:
+#    if: github.event_name == 'push'
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: actions/setup-python@v5
+#        with: { python-version: "3.12" }
+#      - run: graphify/setup-venv.sh
+#      - run: graphify/.venv/bin/python graphify/build.py --repo . --manifest docs/wiki/manifest.json --owner "${{ github.event.repository.name }}" --wiki-dir docs/wiki
+#      - uses: actions/upload-artifact@v4
+#        with: { name: code-graph, path: graphify-out/ }

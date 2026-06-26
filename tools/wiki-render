@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""wiki-render — render docs/wiki/ into GitHub Wiki pages.
+
+The cold-start presentation layer: NO extra stack. GitHub Wiki is itself a git repo
+(<repo>.wiki.git); a GitHub Action runs this renderer and pushes the result. Access
+follows repo permissions (private repo → private wiki). GitHub's [[slug]] wikilinks
+match our link convention natively.
+
+  wiki-render <wiki-dir> --out <build-dir> [--repo-url https://github.com/org/repo]
+
+Output: one <slug>.md page per unit (frontmatter stripped, rendered header + freshness
+banner + source links), plus Home.md (index grouped by type, stale/superseded called
+out) and _Sidebar.md (navigation). The wiki is a DERIVED MIRROR — edit docs/wiki/,
+not the wiki UI (web edits are overwritten on next publish). Requires PyYAML.
+"""
+from __future__ import annotations
+import argparse, sys
+from collections import defaultdict
+from pathlib import Path
+try:
+    import yaml
+except ImportError:
+    print("wiki-render: needs PyYAML"); sys.exit(2)
+
+BADGE = {"draft": "🟡 draft", "active": "🟢 active", "stale": "🟠 STALE",
+         "superseded": "⚫ SUPERSEDED"}
+
+def split_frontmatter(text):
+    if not text.startswith("---"):
+        return None, text
+    end = text.find("\n---", 3)
+    if end == -1:
+        return None, text
+    return text[3:end].strip(), text[end + 4:].lstrip("\n")
+
+def source_links(fm, repo_url):
+    out = []
+    for s in (fm.get("source") or []):
+        if not isinstance(s, dict):
+            continue
+        path, sym, prov = s.get("path"), s.get("symbol"), s.get("provenance")
+        label = path + (f" · `{sym}`" if sym else "")
+        if repo_url and prov and all(c in "0123456789abcdefABCDEF" for c in str(prov)):
+            out.append(f"[{label}]({repo_url}/blob/{prov}/{path})")
+        else:
+            out.append(f"`{label}`" + (f" ({prov})" if prov else ""))
+    return out
+
+def render_page(slug, fm, body, repo_url):
+    status = fm.get("status", "")
+    head = [f"# {fm.get('title', slug)}", ""]
+    meta = f"{BADGE.get(status, status)} · **{fm.get('type','')}** · owner: {fm.get('owner','')}"
+    meta += f" · last verified: {fm.get('last_verified','?')}"
+    head.append(f"> {meta}")
+    if status == "stale":
+        head += ["", "> ⚠️ **STALE** — the source may have moved since last verification."]
+    if status == "superseded":
+        sb = fm.get("superseded_by")
+        head += ["", f"> ⚫ **SUPERSEDED** by [[{sb}]] ({fm.get('superseded_at','')}). Kept as a tombstone."]
+    head.append("")
+    page = "\n".join(head) + "\n" + body.rstrip() + "\n"
+    links = source_links(fm, repo_url)
+    if links:
+        page += "\n---\n**Source:** " + " · ".join(links) + "\n"
+    rel = fm.get("relates") or []
+    if rel:
+        page += "**Related:** " + " · ".join(f"[[{r}]]" for r in rel) + "\n"
+    return page
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("wiki_dir", type=Path)
+    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--repo-url", default="")
+    a = ap.parse_args()
+    a.out.mkdir(parents=True, exist_ok=True)
+
+    units = {}
+    for f in sorted(a.wiki_dir.glob("*.md")):
+        fm_raw, body = split_frontmatter(f.read_text(encoding="utf-8"))
+        if fm_raw is None:
+            continue
+        try:
+            fm = yaml.safe_load(fm_raw) or {}
+        except yaml.YAMLError:
+            continue
+        units[f.stem] = (fm, body)
+        (a.out / f"{f.stem}.md").write_text(render_page(f.stem, fm, body, a.repo_url),
+                                            encoding="utf-8")
+
+    by_type = defaultdict(list)
+    for slug, (fm, _) in sorted(units.items()):
+        by_type[fm.get("type", "other")].append((slug, fm))
+    home = ["# Knowledge Wiki", "",
+            f"_{len(units)} units · generated from `docs/wiki/` — do not edit here, edit the source._", ""]
+    for t in ("decision", "explanation", "howto", "tutorial", "reference", "other"):
+        if t not in by_type:
+            continue
+        home.append(f"## {t}")
+        for slug, fm in by_type[t]:
+            flag = ""
+            if fm.get("status") == "stale": flag = " 🟠"
+            if fm.get("status") == "superseded": flag = " ⚫"
+            home.append(f"- [[{slug}]] — {fm.get('title', slug)}{flag}")
+        home.append("")
+    (a.out / "Home.md").write_text("\n".join(home), encoding="utf-8")
+
+    side = ["### Knowledge Wiki", "", "- [[Home]]"]
+    for slug in sorted(units):
+        side.append(f"- [[{slug}]]")
+    (a.out / "_Sidebar.md").write_text("\n".join(side) + "\n", encoding="utf-8")
+    print(f"wiki-render: {len(units)} pages + Home + _Sidebar → {a.out}")
+
+if __name__ == "__main__":
+    main()

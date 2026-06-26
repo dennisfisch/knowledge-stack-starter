@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""wiki-lint — schema gate for the knowledge wiki (schema v1, English).
+
+Deterministic CI gate (replaces a dedicated curator agent). Run on changed units
+in PR CI and locally before committing.
+
+  wiki-lint <path...> [--strict]      # validate units (file or dir = corpus mode)
+
+Exit 1 on any error. Corpus mode (a directory) additionally checks cross-references
+and bidirectional supersession. Requires PyYAML.
+"""
+from __future__ import annotations
+import re, sys
+from pathlib import Path
+try:
+    import yaml
+except ImportError:
+    print("wiki-lint: needs PyYAML (pip install pyyaml)"); sys.exit(2)
+
+TYPES = {"reference", "howto", "tutorial", "explanation", "decision"}
+CODE_TYPES = {"reference", "howto", "tutorial"}          # source + commit hash required
+STATUSES = {"draft", "active", "stale", "superseded"}
+TIERS = {"agent-compacted", "verified", "primary-source"}
+HALF_LIVES = {"static", "versioned", "event"}
+REQUIRED = ("title", "type", "owner", "status", "provenance_tier",
+            "created", "updated", "last_verified")
+DATE_FIELDS = ("created", "updated", "last_verified", "superseded_at", "review_after",
+               "valid_from")
+SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+HEX_RE = re.compile(r"^[0-9a-f]{7,}$", re.I)
+
+def split_frontmatter(text: str):
+    if not text.startswith("---"):
+        return None, text
+    end = text.find("\n---", 3)
+    if end == -1:
+        return None, text
+    return text[3:end].strip(), text[end + 4:]
+
+def lint_unit(path: Path):
+    errs, warns = [], []
+    slug = path.stem
+    if not SLUG_RE.match(slug):
+        errs.append(f"slug '{slug}' is not kebab-case")
+    fm_raw, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+    if fm_raw is None:
+        return [f"{path}: no frontmatter block"], [], {}
+    try:
+        fm = yaml.safe_load(fm_raw) or {}
+    except yaml.YAMLError as e:
+        return [f"{path}: invalid YAML ({e})"], [], {}
+    if not isinstance(fm, dict):
+        return [f"{path}: frontmatter is not a mapping"], [], {}
+
+    for f in REQUIRED:
+        if not fm.get(f):
+            errs.append(f"missing required field '{f}'")
+    t = fm.get("type")
+    if t and t not in TYPES:
+        errs.append(f"type '{t}' not in {sorted(TYPES)}")
+    if fm.get("status") not in STATUSES and fm.get("status") is not None:
+        errs.append(f"status '{fm.get('status')}' not in {sorted(STATUSES)}")
+    if fm.get("provenance_tier") not in TIERS and fm.get("provenance_tier") is not None:
+        errs.append(f"provenance_tier '{fm.get('provenance_tier')}' not in {sorted(TIERS)}")
+    if fm.get("half_life_kind") and fm["half_life_kind"] not in HALF_LIVES:
+        errs.append(f"half_life_kind '{fm['half_life_kind']}' not in {sorted(HALF_LIVES)}")
+    for f in DATE_FIELDS:
+        if fm.get(f) and not DATE_RE.match(str(fm[f])):
+            errs.append(f"{f} '{fm[f]}' is not YYYY-MM-DD")
+    if fm.get("created") and fm.get("updated") and str(fm["updated"]) < str(fm["created"]):
+        errs.append("updated is before created")
+    c = fm.get("confidence")
+    if c is not None and not (isinstance(c, (int, float)) and 0.0 <= c <= 1.0):
+        errs.append(f"confidence '{c}' not in [0,1]")
+
+    src = fm.get("source")
+    if t in CODE_TYPES:
+        if not src:
+            errs.append(f"type '{t}' requires a source")
+        else:
+            for s in (src if isinstance(src, list) else [src]):
+                prov = str(s.get("provenance", "")) if isinstance(s, dict) else ""
+                if not HEX_RE.match(prov):
+                    errs.append(f"source.provenance '{prov}' must be a commit hash (hex ≥7) for type {t}")
+
+    if fm.get("status") == "superseded":
+        for f in ("superseded_by", "superseded_at"):
+            if not fm.get(f):
+                errs.append(f"status=superseded requires {f}")
+
+    if t in {"explanation", "decision"} and not fm.get("review_after") and not fm.get("half_life_kind"):
+        warns.append(f"{t} without review_after or half_life_kind (freshness undefined)")
+    if fm.get("provenance_tier") == "agent-compacted" and not src:
+        warns.append("agent-compacted without source (unbacked synthesis claim)")
+    if not fm.get("entities"):
+        warns.append("no entities (no blast-radius edges)")
+
+    return [f"{path}: {e}" for e in errs], [f"{path}: {w}" for w in warns], fm
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    strict = "--strict" in sys.argv
+    paths, corpus = [], False
+    for a in args:
+        p = Path(a)
+        if p.is_dir():
+            corpus = True
+            # Units are kebab-case slugs; skip tooling/index files (SCHEMA.md,
+            # README.md, Home.md, _Sidebar.md, …) which aren't units.
+            paths.extend(sorted(x for x in p.glob("*.md") if SLUG_RE.match(x.stem)))
+        else:
+            paths.append(p)
+    if not paths:
+        print("usage: wiki-lint <path...> [--strict]"); sys.exit(2)
+
+    all_errs, all_warns, parsed = [], [], {}
+    for p in paths:
+        e, w, fm = lint_unit(p)
+        all_errs += e; all_warns += w
+        if fm:
+            parsed[p.stem] = fm
+
+    if corpus:
+        for slug, fm in parsed.items():
+            for ref in (fm.get("relates") or []):
+                if ref not in parsed:
+                    all_warns.append(f"{slug}: relates '{ref}' not found in corpus")
+            sb = fm.get("superseded_by")
+            if sb:
+                if sb not in parsed:
+                    all_errs.append(f"{slug}: superseded_by '{sb}' not found")
+                elif parsed[sb].get("supersedes") != slug:
+                    all_errs.append(f"{slug}: superseded_by '{sb}' but '{sb}' does not supersede '{slug}'")
+
+    for w in all_warns:
+        print(f"WARN  {w}")
+    for e in all_errs:
+        print(f"ERROR {e}")
+    fail = bool(all_errs) or (strict and bool(all_warns))
+    print(f"\nwiki-lint: {len(parsed)} units, {len(all_errs)} errors, {len(all_warns)} warnings"
+          + (" [strict]" if strict else ""))
+    sys.exit(1 if fail else 0)
+
+if __name__ == "__main__":
+    main()

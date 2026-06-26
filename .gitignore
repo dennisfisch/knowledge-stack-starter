@@ -1,0 +1,6 @@
+graphify-out/
+graphify/.venv/
+.wiki-build/
+__pycache__/
+*.pyc
+.herenow/
