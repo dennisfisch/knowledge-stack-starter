@@ -9,8 +9,10 @@ side effect of normal work — there is no docs team.
 1. **Read graph-first.** Architecture / "what does changing X affect?" → query the
    graph before grepping:
    ```bash
-   python3 graphify/gquery.py blast "<symbol-or-slug>"     # needs no venv
+   python3 graphify/gquery.py blast "<symbol-or-slug>"
    ```
+   It auto-rebuilds if the graph is stale/missing (needs the venv only then; a fresh
+   query is venv-free). `--no-rebuild` for a pure read.
 2. **Do the work** in your worktree / feature branch.
 3. **Write-after-change.** If this established durable truth, run **`/wiki`**: it writes
    or mutates atomic units in `docs/wiki/`, in the **same PR** as the code.

@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
-"""gquery.py — deterministic graph queries.
+"""gquery.py — deterministic graph queries, with lazy auto-rebuild.
 
-The reading side, no LLM / no token: blast-radius, path, neighbors — pure graph
-traversal over graphify-out/graph.json. (Natural-language `graphify query "…"` is a
-separate host/skill step on the subscription.)
+The reading side: blast-radius, path, neighbors — pure graph traversal over
+graphify-out/graph.json. (Natural-language `graphify query "…"` is a separate
+host/skill step on the subscription.)
 
-Blast-radius is deliberately UNDIRECTED (correct in both directions): Graphify's
-native `affected` follows only incoming edges and is orientation-nondeterministic on
-undirected graphs — so we use our own symmetric BFS here.
+LAZY FRESHNESS: before querying, gquery compares the graph's `built_at_commit` to the
+repo's HEAD. If the graph is stale or missing, it rebuilds (via graphify/run build.py,
+which needs the shared venv) — so the graph is fresh exactly when you ask, with zero
+cost when it's already current. Disable with --no-rebuild (pure read, no venv).
+Note: staleness is commit-based — it won't detect uncommitted working-tree edits;
+rebuild manually if you've changed code without committing.
+
+Blast-radius is deliberately UNDIRECTED (correct in both directions): Graphify's native
+`affected` follows only incoming edges and is orientation-nondeterministic on undirected
+graphs — so we use our own symmetric BFS here.
 
   gquery.py blast <seed> [--depth 2]    # what is connected to <seed> (code+wiki+entity)
   gquery.py path  <a> <b>               # shortest path
   gquery.py neighbors <seed>            # direct neighbors
+  [--repo PATH] [--no-rebuild]
 """
 from __future__ import annotations
-import argparse, json, re, sys
+import argparse, json, re, subprocess, sys
 from pathlib import Path
 
 REL_DEFAULT = {"calls","references","imports","imports_from","contains","defines",
@@ -22,8 +30,63 @@ REL_DEFAULT = {"calls","references","imports","imports_from","contains","defines
 
 def norm(s): return re.sub(r"[^a-z0-9]+","",(s or "").lower())
 
-def load(repo):
-    g = json.loads((Path(repo)/"graphify-out"/"graph.json").read_text(encoding="utf-8"))
+# --- lazy freshness -------------------------------------------------------------
+def _head(repo: Path):
+    try:
+        r = subprocess.run(["git","-C",str(repo),"rev-parse","HEAD"],
+                           capture_output=True, text=True)
+        return r.stdout.strip() or None
+    except Exception:
+        return None
+
+def _built_commit(graph_path: Path):
+    try:
+        return json.loads(graph_path.read_text(encoding="utf-8")).get("built_at_commit") or None
+    except Exception:
+        return None
+
+def _fresh(head, built):
+    if not built: return False
+    if not head:  return True            # can't determine HEAD -> don't churn
+    n = min(len(head), len(built))
+    return head[:n] == built[:n]
+
+def ensure_fresh(repo: Path, no_rebuild: bool):
+    gp = repo / "graphify-out" / "graph.json"
+    if no_rebuild:
+        return
+    if gp.exists() and _fresh(_head(repo), _built_commit(gp)):
+        return
+    run = repo / "graphify" / "run"
+    if not run.exists():
+        print("gquery: graph stale/missing and graphify/run not found — using existing graph if any.",
+              file=sys.stderr)
+        return
+    reason = "missing" if not gp.exists() else "stale"
+    print(f"gquery: graph {reason} — rebuilding (needs the shared venv; --no-rebuild to skip)…",
+          file=sys.stderr)
+    cmd = [str(run), "build.py", "--repo", str(repo), "--owner", repo.name]
+    wiki = repo / "docs" / "wiki"
+    try:
+        if wiki.exists():
+            mt = wiki / "wiki-manifest"
+            if mt.exists():
+                subprocess.run(["python3", str(mt), str(wiki), "--repo", repo.name],
+                               check=False, cwd=str(repo))
+            cmd += ["--manifest", str(wiki / "manifest.json"), "--wiki-dir", str(wiki)]
+        subprocess.run(cmd, check=True, cwd=str(repo))
+    except (subprocess.CalledProcessError, FileNotFoundError, PermissionError) as e:
+        if gp.exists():
+            print(f"gquery: rebuild failed ({e}); querying the stale graph. "
+                  f"Fix: graphify/setup-venv.sh", file=sys.stderr)
+        else:
+            print(f"gquery: rebuild failed ({e}) and no graph exists. "
+                  f"Run graphify/setup-venv.sh, then graphify/run build.py …", file=sys.stderr)
+            sys.exit(1)
+
+# --- graph load + queries -------------------------------------------------------
+def load(repo: Path):
+    g = json.loads((repo/"graphify-out"/"graph.json").read_text(encoding="utf-8"))
     nodes = {n["id"]: n for n in g["nodes"]}
     adj = {}
     for l in g["links"]:
@@ -51,8 +114,17 @@ def main() -> int:
     ap.add_argument("args", nargs="+")
     ap.add_argument("--repo", default=".")
     ap.add_argument("--depth", type=int, default=2)
+    ap.add_argument("--no-rebuild", action="store_true",
+                    help="don't auto-rebuild a stale graph (pure read, no venv)")
     a = ap.parse_args()
-    g, nodes, adj = load(a.repo)
+    repo = Path(a.repo).resolve()
+    ensure_fresh(repo, a.no_rebuild)
+    try:
+        g, nodes, adj = load(repo)
+    except FileNotFoundError:
+        print("gquery: no graph found. Build it: graphify/run build.py --repo . "
+              "--manifest docs/wiki/manifest.json --owner <name> --wiki-dir docs/wiki", file=sys.stderr)
+        return 1
 
     if a.cmd in ("blast","neighbors"):
         seed = resolve(nodes, a.args[0])

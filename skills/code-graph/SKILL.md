@@ -29,6 +29,11 @@ python3 graphify/gquery.py neighbors "X"
 Use `blast` for impact analysis ("I'm changing `create_charge` — what breaks, which
 decisions/how-tos are in scope?"). It spans code↔wiki via the bridge.
 
+**Freshness is automatic (lazy).** `gquery` compares the graph's `built_at_commit` to
+HEAD and rebuilds itself when stale or missing (using the shared venv only then; a fresh
+query stays venv-free). Pass `--no-rebuild` for a pure read. Commit-based staleness can't
+see uncommitted edits — rebuild manually (below) after changing code without committing.
+
 ## Natural-language questions
 
 "How does X work / trace the data flow through Z" — answer it yourself from the

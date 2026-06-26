@@ -12,9 +12,10 @@ and a queryable code graph (`graphify-out/`). Treat both as first-class.
 paths, or blast-radius: query the graph BEFORE grepping.
 - `python3 graphify/gquery.py blast "<symbol|slug>" --depth 2`  (impact, spans code↔wiki)
 - `python3 graphify/gquery.py path "A" "B"` · `neighbors "X"`
-- Queries need NO venv (stdlib only) — they just read `graphify-out/graph.json`.
-- Check freshness (`built_at_commit` in `graphify-out/GRAPH_REPORT.md` vs `git rev-parse HEAD`);
-  if stale/absent, rebuild (free, local, in your worktree): `python3 docs/wiki/wiki-manifest docs/wiki --repo <owner>` then `graphify/run build.py --repo . --manifest docs/wiki/manifest.json --owner <owner> --wiki-dir docs/wiki`. The graph is gitignored (never committed).
+- **Freshness is automatic:** `gquery` rebuilds the graph itself when it's stale (HEAD
+  moved) or missing — needs the shared venv only then; a fresh query is venv-free.
+  `--no-rebuild` skips it. The graph is gitignored (never committed). Commit-based
+  staleness won't see uncommitted edits — rebuild manually after those.
 - Natural-language "how does X work" you answer yourself from the graph + sources
   (your session = the LLM; **never** an API token).
 
