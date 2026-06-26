@@ -9,15 +9,14 @@ name: knowledge
 #     save anything (a wiki can't be pushed to until it exists). After that this
 #     Action owns it. Wiki visibility follows the repo (private repo → private wiki).
 #     The wiki is a DERIVED MIRROR: edit docs/wiki/, not the UI.
-#  2. A token that can push to the wiki. The built-in GITHUB_TOKEN works ONLY if the
-#     org allows write (the repo "Workflow permissions" toggle). If that toggle is
-#     greyed out (org/enterprise-managed) or you'd rather not depend on it, create a
-#     token and store it as the repo secret WIKI_TOKEN — the push step prefers it and
-#     falls back to GITHUB_TOKEN. Options for WIKI_TOKEN (any one):
-#       - Fine-grained PAT: Repository access = this repo, Permissions → Contents: RW.
-#       - Classic PAT: scope `repo` (most reliable for wikis).
-#       - Deploy key with write access (most scoped; add private key as the secret).
-#     Add it under repo → Settings → Secrets and variables → Actions → New secret.
+#  2. Push auth — pick ONE, by what your org policy allows (push step tries them in
+#     this order). Add secrets under repo → Settings → Secrets and variables → Actions.
+#       - WIKI_SSH_KEY  (recommended for teams): a write Deploy Key. Repo-bound, NOT
+#         tied to a personal user — survives offboarding. See the push step for the
+#         ssh-keygen recipe. SSH push.
+#       - WIKI_TOKEN: a PAT (fine-grained Contents: RW, or classic scope `repo`).
+#         User-bound. Use when the "Workflow permissions" toggle is greyed out.
+#       - GITHUB_TOKEN (built-in): works only if the org allows write (that toggle).
 
 on:
   pull_request:
@@ -56,14 +55,34 @@ jobs:
       - name: Refresh source-anchor manifest
         run: python3 docs/wiki/wiki-manifest docs/wiki/ --repo "${{ github.event.repository.name }}"
       - name: Push to GitHub Wiki
-        # Prefer a dedicated WIKI_TOKEN secret (works even when the repo "Workflow
-        # permissions" toggle is greyed out by org policy); fall back to GITHUB_TOKEN.
+        # Three-way auth, pick whatever your org policy allows (no marketplace action):
+        #   1. WIKI_SSH_KEY — a write Deploy Key (repo-bound, NOT tied to a personal
+        #      user; best for teams). SSH push. Preferred when set.
+        #   2. WIKI_TOKEN   — a PAT (Contents: RW). HTTPS push. Use when the repo
+        #      "Workflow permissions" toggle is greyed out by org policy.
+        #   3. GITHUB_TOKEN — the built-in token. Works only if the org allows write.
+        # Set up the Deploy Key:
+        #   ssh-keygen -t ed25519 -f wiki_deploy_key -N "" -C wiki-publish
+        #   add wiki_deploy_key.pub  → repo Settings → Deploy keys (✓ Allow write access)
+        #   add wiki_deploy_key (private) → repo Settings → Secrets → Actions → WIKI_SSH_KEY
         env:
+          WIKI_SSH_KEY: ${{ secrets.WIKI_SSH_KEY }}
           GH_TOKEN: ${{ secrets.WIKI_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           git config --global user.name  "knowledge-bot"
           git config --global user.email "knowledge-bot@users.noreply.github.com"
-          git clone "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.wiki.git" wiki
+          if [ -n "${WIKI_SSH_KEY}" ]; then
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            printf '%s\n' "${WIKI_SSH_KEY}" > ~/.ssh/wiki_key
+            chmod 600 ~/.ssh/wiki_key
+            ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null
+            export GIT_SSH_COMMAND="ssh -i ~/.ssh/wiki_key -o IdentitiesOnly=yes"
+            WIKI_URL="git@github.com:${GITHUB_REPOSITORY}.wiki.git"
+          else
+            WIKI_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          fi
+          git clone "${WIKI_URL}" wiki
           rm -f wiki/*.md
           cp .wiki-build/*.md wiki/
           cd wiki

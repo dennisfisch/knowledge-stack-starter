@@ -34,16 +34,24 @@ Repo → **Wiki** → **Create the first page** → save anything. This creates
 `<repo>.wiki.git`; from now on the Action owns it. (A wiki can't be pushed to until
 it exists.)
 
-**Give the Action a token that can push to the wiki.** Easiest: repo → Settings →
-Actions → General → Workflow permissions → **Read and write**. If that toggle is
-**greyed out** (managed by your org/enterprise), don't fight it — add a dedicated
-token secret instead, which the workflow prefers automatically:
-- Create a token: a fine-grained PAT (Repository access = this repo, Permissions →
-  **Contents: Read and write**), or a classic PAT with scope **`repo`** (most reliable
-  for wikis), or a write **deploy key**.
-- Add it under repo → Settings → Secrets and variables → Actions → **New repository
-  secret**, named **`WIKI_TOKEN`**.
-The `publish-wiki` job uses `WIKI_TOKEN` if present and falls back to `GITHUB_TOKEN`.
+**Give the Action a way to push to the wiki.** Three options — the `publish-wiki` job
+tries them in this order; pick whatever your org policy allows. Add secrets under repo
+→ Settings → Secrets and variables → Actions → **New repository secret**.
+
+- **`WIKI_SSH_KEY` — write Deploy Key (recommended for teams).** Repo-bound, **not tied
+  to a personal user**, so it survives offboarding and needs no account PAT:
+  ```bash
+  ssh-keygen -t ed25519 -f wiki_deploy_key -N "" -C wiki-publish
+  # wiki_deploy_key.pub → repo Settings → Deploy keys → Add → ✓ Allow write access
+  # wiki_deploy_key (private) → Actions secret named WIKI_SSH_KEY
+  ```
+  A write deploy key on the repo can also push its `*.wiki.git`.
+- **`WIKI_TOKEN` — a PAT.** Fine-grained (Repository access = this repo, Contents: RW)
+  or classic (scope `repo`). **User-bound.** Use this when the Settings → Actions →
+  General → Workflow permissions **Read and write** toggle is **greyed out** by org policy.
+- **`GITHUB_TOKEN` (built-in).** Used automatically if you *can* set that toggle to
+  Read and write. No secret needed.
+
 Everything else (checkout, lint) only needs read, so a read-only default is fine.
 
 **3. Write the first unit** (or backfill from a boilerplate repo — Part C). Easiest:
