@@ -101,6 +101,8 @@ def lint_unit(path: Path):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     strict = "--strict" in sys.argv
+    if not args:
+        print("usage: wiki-lint <path...> [--strict]"); sys.exit(2)
     paths, corpus = [], False
     for a in args:
         p = Path(a)
@@ -111,8 +113,10 @@ def main():
             paths.extend(sorted(x for x in p.glob("*.md") if SLUG_RE.match(x.stem)))
         else:
             paths.append(p)
+    # An empty wiki (no unit files yet) is a PASS, not an error — don't break CI on a
+    # freshly scaffolded repo or a PR that touched only tooling/index files.
     if not paths:
-        print("usage: wiki-lint <path...> [--strict]"); sys.exit(2)
+        print("wiki-lint: no wiki units found — nothing to validate"); sys.exit(0)
 
     all_errs, all_warns, parsed = [], [], {}
     for p in paths:
